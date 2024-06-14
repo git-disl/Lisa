@@ -81,6 +81,24 @@ cd ../..
 ```
 
 
+## Citation
+If you feel our project is useful, you may cite our paper with the following bibtex.
+```
+@article{huang2024lazy,
+  title={Lazy Safety Alignment for Large Language Models against Harmful Fine-tuning},
+  author={Huang, Tiansheng and Hu, Sihao and Ilhan, Fatih and Tekin, Selim Furkan and Liu, Ling},
+  journal={arXiv preprint arXiv:2405.18641},
+  year={2024}
+}
+```
 
+```
+@article{huang2024vaccine,
+  title={Vaccine: Perturbation-aware alignment for large language model},
+  author={Huang, Tiansheng and Hu, Sihao and Liu, Ling},
+  journal={arXiv preprint arXiv:2402.01109},
+  year={2024}
+}
+```
 
 
