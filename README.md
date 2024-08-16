@@ -9,14 +9,14 @@ Lisa is a safety alignment method against thee threat of harmful fine-tuning. We
 
 
 ## Main code logistic
-We implement a cusomized trainer on top of the original HuggingFace Trainer. To achieve Bi-state optimization,  we append one line of code in function ` training_step()` of `trainer.py`. 
+We implement a customized trainer on top of the original HuggingFace Trainer. To achieve Bi-state optimization,  we append one line of code in function ` training_step()` of `trainer.py`. 
 
 ```
 inputs = self.check_mode(inputs) //Appended code: switch dataset/model according to steps number
 loss = step()  //Gradient backward with the data and model
 ```
 
-To introduce a proximal term towards consensus, we need add the following regularization to the loss in function `step()`.
+To introduce a proximal term towards consensus, we need to add the following regularization to the loss in function `step()`.
 
 ```
 if self.status =="alignment":
