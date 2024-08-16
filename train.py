@@ -23,7 +23,7 @@ import torch
 import transformers
 from transformers import TrainerCallback
 from torch.utils.data import Dataset
-from trainer import BaseTrainer,FITrainer,RandomVaccineTrainer,ADMMTrainer
+from trainer import VaccineTrainer,FITrainer,RandomVaccineTrainer,LisaTrainer
 from peft import LoraConfig, get_peft_model, prepare_model_for_int8_training, PeftModel
 import wandb
 wandb.init(mode="disabled")
@@ -419,7 +419,7 @@ def train():
     if training_args.optimizer=="vaccine":
         print("init vaccine")
         import torch.optim as optim
-        trainer = BaseTrainer(model=model, tokenizer=tokenizer, args=training_args,**data_module)
+        trainer = VaccineTrainer(model=model, tokenizer=tokenizer, args=training_args,**data_module)
         trainer.density = training_args.density
     elif "EWC" in training_args.optimizer:
         import torch.optim as optim
@@ -428,7 +428,7 @@ def train():
     elif training_args.optimizer == "random_vaccine":
         trainer = RandomVaccineTrainer(model=model, tokenizer=tokenizer, args=training_args,**data_module)
     elif training_args.optimizer == "lisa":
-        trainer = ADMMTrainer(model=model, tokenizer=tokenizer, args=training_args,**data_module)
+        trainer = LisaTrainer(model=model, tokenizer=tokenizer, args=training_args,**data_module)
         alignment_dataset  = SupervisedDataset(tokenizer=tokenizer, data_path="BeaverTails_safe",guide_data_num=data_args.guide_data_num)
         trainer.init(alignment_dataset)
     elif training_args.optimizer == "vlguard":

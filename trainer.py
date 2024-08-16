@@ -37,7 +37,7 @@ logger = logging.get_logger(__name__)
             
 
 
-class ADMMTrainer(Trainer):
+class LisaTrainer(Trainer):
     
     def get_alignment_dataloader(self,alignment_dataset) -> DataLoader:
         """
@@ -179,15 +179,12 @@ class ADMMTrainer(Trainer):
                 loss = loss.mean()  # mean() to average on multi-gpu parallel training
             if self.status =="alignment":
                 # print("alignment_loss_prev: {}".format(loss.item()))
+                # don't do proximal in the inital 10% of steps. It will downgrade benign accuracy'
                 if self.steps>0.1* len(self.get_train_dataloader()) * self.args.num_train_epochs:
                     for name, param in model.named_parameters():
                         if param.requires_grad and self.args.rho>0:
-                            # loss +=torch.sum(self.gamma[name] *  param)+ self.args.rho/2* torch.norm( param- self.finetune_weights[name])**2
                             loss += self.args.rho/2* torch.norm( param- self.finetune_weights[name])**2
-                # print("alignment_loss: {}".format(loss.item()))
             else:
-                # print("finetune_loss_prev: {}".format(loss.item()))
-                
                 if self.steps>0.1* len(self.get_train_dataloader()) * self.args.num_train_epochs:
                     for name, param in model.named_parameters():
                         # we observe that for Gsm8k, proximal term will hurt convergence. Don't do proximal for the first few rounds.
@@ -229,7 +226,7 @@ def get_leaf_modules_with_grad(module):
     return module_list
             
             
-class BaseTrainer(Trainer):
+class VaccineTrainer(Trainer):
     def training_step(
         self, model: nn.Module, inputs: Dict[str, Union[torch.Tensor, Any]]
     ) -> torch.Tensor:
@@ -257,9 +254,9 @@ class BaseTrainer(Trainer):
 
         # if isinstance(self.optimizer,ESAM ):
         # print("calling sam")
-        self.sam_state = {}
-        self.sam_state ["hooks"] = []
-        self.sam_state ["gradient"] = {}
+        self.vaccine_state = {}
+        self.vaccine_state ["hooks"] = []
+        self.vaccine_state ["gradient"] = {}
         self.pre_first_step(model)
         step()
         self.after_first_step(model)
@@ -279,7 +276,7 @@ class BaseTrainer(Trainer):
     def pre_first_step(self, model ):
         def track_gradient_hook(module, grad_input, grad_output):
             # Store the gradients for the current layer
-            self.sam_state["gradient"][module] = grad_output[0].detach().clone()/self.args.gradient_accumulation_steps
+            self.vaccine_state["gradient"][module] = grad_output[0].detach().clone()/self.args.gradient_accumulation_steps
             # print(grad_output[0])
             
         def apply_backward_hooks_recursive(module, hook_fn, hooks):
@@ -289,8 +286,8 @@ class BaseTrainer(Trainer):
         # Call the function with the initial empty hooks list
         leaf_modules_with_grad = get_leaf_modules_with_grad(model)
         for layer in leaf_modules_with_grad:
-            self.sam_state["gradient"][layer] = 0
-            apply_backward_hooks_recursive(layer, track_gradient_hook, self.sam_state["hooks"])
+            self.vaccine_state["gradient"][layer] = 0
+            apply_backward_hooks_recursive(layer, track_gradient_hook, self.vaccine_state["hooks"])
             
     
     
@@ -298,7 +295,7 @@ class BaseTrainer(Trainer):
     def pre_second_step(self, model):
         def purturbation_hook(module, input, output):
             # Modify the output, for example, by adding a perturbatio
-            perturbation = self.sam_state["gradient"][module]
+            perturbation = self.vaccine_state["gradient"][module]
             # print(perturbation[0,1,:])
             # # print(output.shape)
             # print(output[0,1,:])
@@ -317,33 +314,33 @@ class BaseTrainer(Trainer):
         for layer in leaf_modules_with_grad:
             # print(layer._get_name())
             # Apply hooks to all layers, including nested Sequential blocks
-            apply_purturbation_hooks_recursive(layer, purturbation_hook, self.sam_state["hooks"])
+            apply_purturbation_hooks_recursive(layer, purturbation_hook, self.vaccine_state["hooks"])
         
     @torch.no_grad()
     def after_first_step(self, model):
-        for hook in self.sam_state["hooks"]:
+        for hook in self.vaccine_state["hooks"]:
             hook.remove()
-        self.sam_state["hooks"] = []
+        self.vaccine_state["hooks"] = []
         
-        # print(self.sam_state["gradient"].items())
-        grad_norm = self._grad_norm(self.sam_state["gradient"])
+        # print(self.vaccine_state["gradient"].items())
+        grad_norm = self._grad_norm(self.vaccine_state["gradient"])
         # logging.info(grad_norm)
         # logging.info("norm{}".format(grad_norm))
-        for module in self.sam_state["gradient"]:
-            # grad_norm = self._grad_norm(self.sam_state["gradient"][module])
-            grad = self.sam_state["gradient"][module]
+        for module in self.vaccine_state["gradient"]:
+            # grad_norm = self._grad_norm(self.vaccine_state["gradient"][module])
+            grad = self.vaccine_state["gradient"][module]
             scale = self. args. rho  / (grad_norm +1e-7) 
             e_r =  (grad)* scale
-            self.sam_state["gradient"][module] = e_r.detach().clone()
+            self.vaccine_state["gradient"][module] = e_r.detach().clone()
    
     @torch.no_grad()
     def after_second_step(self, model):
         # disable hook here
-        # for module in self.sam_state["e_r"]:
-        #     module.weight.data -= self.sam_state["e_r"][module]
-        for hook in self.sam_state["hooks"]:
+        # for module in self.vaccine_state["e_r"]:
+        #     module.weight.data -= self.vaccine_state["e_r"][module]
+        for hook in self.vaccine_state["hooks"]:
             hook.remove()
-        self.sam_state["hooks"] = []
+        self.vaccine_state["hooks"] = []
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
 
 
@@ -390,9 +387,9 @@ class RandomVaccineTrainer(Trainer):
                 # print("gere2")
             return loss 
 
-        self.sam_state = {}
-        self.sam_state ["hooks"] = []
-        self.sam_state ["gradient"] = {}
+        self.vaccine_state = {}
+        self.vaccine_state ["hooks"] = []
+        self.vaccine_state ["gradient"] = {}
         self.pre_second_step(model)
         loss = step()
         self.after_second_step(model)
@@ -432,17 +429,17 @@ class RandomVaccineTrainer(Trainer):
         for layer in leaf_modules_with_grad:
             # print(layer._get_name())
             # Apply hooks to all layers, including nested Sequential blocks
-            apply_purturbation_hooks_recursive(layer, purturbation_hook, self.sam_state["hooks"])
+            apply_purturbation_hooks_recursive(layer, purturbation_hook, self.vaccine_state["hooks"])
         
     
     @torch.no_grad()
     def after_second_step(self, model):
         # disable hook here
-        # for module in self.sam_state["e_r"]:
-        #     module.weight.data -= self.sam_state["e_r"][module]
-        for hook in self.sam_state["hooks"]:
+        # for module in self.vaccine_state["e_r"]:
+        #     module.weight.data -= self.vaccine_state["e_r"][module]
+        for hook in self.vaccine_state["hooks"]:
             hook.remove()
-        self.sam_state["hooks"] = []
+        self.vaccine_state["hooks"] = []
         # torch.nn.utils.clip_grad_norm_(model.parameters(), 10)
 
 
@@ -521,11 +518,5 @@ class FITrainer(Trainer):
                 
         
         loss = step()
-        # print( sum([torch.norm(self.sam_state ["gradient"][module]) for module in self.sam_state ["gradient"]  ]))
-        # leaf_modules_with_grad = get_leaf_modules_with_grad(model)
-        # for module in leaf_modules_with_grad:
-        #     # print(module.q_proj.lora_A["default"])
-        #     module.weight.grad*= (1-self.masks[index])
-        #     index+=1
         self.round+=1
         return loss.detach() / self.args.gradient_accumulation_steps

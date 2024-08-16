@@ -34,9 +34,10 @@ from transformers import (
 )
 from transformers.modeling_outputs import SequenceClassifierOutputWithPast
 from transformers.trainer_utils import EvalPrediction
-
+import sys
+sys.path.append('../..')
 from constants import PROMPT_INPUT
-from utils import calculate_binary_classification_metrics, resize_tokenizer_embedding
+from evaluate_utils import calculate_binary_classification_metrics, resize_tokenizer_embedding
 
 
 __all__ = ['Moderation']
