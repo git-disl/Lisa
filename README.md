@@ -5,7 +5,9 @@
 
 
 
-Lisa is a safety alignment method against thee threat of harmful fine-tuning. We consider a two-stage fine-tuning scheme: i) Alignment stage, in which we align the model with human-preference dataset (alignment dataset), and ii) finetuning stage, in which we finetune the model with a user finetuning dataset (which is mixed with harmful instance). Lisa is applied in the fine-tuning stage, in which a Bi-state optimization with proximal term is utilized to mitigate the risk of the mixed harmful data.     
+Lisa is a fine-tuning stage defense against the threat of harmful fine-tuning.
+
+Check out our [paper](https://arxiv.org/abs/2405.18641).
 
 
 ## Main code logistic
